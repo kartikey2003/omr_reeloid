@@ -3,7 +3,6 @@ import 'package:video_player/video_player.dart';
 
 import 'h.dart';
 import 'homepage.dart';
-import 'new_slider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,18 +17,18 @@ class _SplashScreenState extends State<SplashScreen> {
   /// Initialize the video controller
   void _initializeVideo() {
     _controller =
-        VideoPlayerController.networkUrl(
-            Uri.parse(
-              // "https://download.blender.org/durian/trailer/sintel_trailer-1080p.mp4",
-              "https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4",
-            ),
-          )
-          ..initialize().then((_) {
-            setState(() {}); // Refresh UI after initialization
-            _controller.play(); // Auto-play video
-          })
-          ..setVolume(1.0)
-          ..setLooping(false);
+    VideoPlayerController.networkUrl(
+      Uri.parse(
+        // "https://download.blender.org/durian/trailer/sintel_trailer-1080p.mp4",
+        "https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4",
+      ),
+    )
+      ..initialize().then((_) {
+        setState(() {}); // Refresh UI after initialization
+        _controller.play(); // Auto-play video
+      })
+      ..setVolume(1.0)
+      ..setLooping(false);
 
     _controller.addListener(_videoListener);
   }

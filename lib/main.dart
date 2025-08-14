@@ -4,7 +4,7 @@ import 'package:new_u/splash.dart';
 
   void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
+   MediaKit.ensureInitialized();
   runApp(const MyApp());
 }
 

@@ -1,267 +1,235 @@
 import 'package:flutter/material.dart';
-import 'package:better_player/better_player.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
-class MultiAudioPlayer extends StatefulWidget {
-  const MultiAudioPlayer({Key? key}) : super(key: key);
+class VideoPlayerScreen extends StatefulWidget {
+  const VideoPlayerScreen({super.key});
 
   @override
-  State<MultiAudioPlayer> createState() => _MultiAudioPlayerState();
+  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _MultiAudioPlayerState extends State<MultiAudioPlayer> {
-  late BetterPlayerController _betterPlayerController;
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  final String videoUrl =
-      "https://1500033163.vod-qcloud.com/1440fb6evodsgp1500033163/93417e6f1397757909725153541/1XVLBp1aLr0A.mp4";
-
-  final Map<String, String> audioTracks = {
-    "Hindi":
-    "https://1500033163.vod-qcloud.com/1440fb6evodsgp1500033163/c87be6db1397757909699155424/DihMYRc49MMA.mp3",
-    "English":
-    "https://1500033163.vod-qcloud.com/1440fb6evodsgp1500033163/c87a529f1397757909699152818/AkfAA6ZH3ykA.mp3",
-    "Bengali":
-    "https://1500033163.vod-qcloud.com/1440fb6evodsgp1500033163/95851fb81397757909725244684/PATrhzNKpsoA.mp3",
-  };
-
-  final Map<String, double> playbackSpeeds = {
-    "0.5x": 0.5,
-    "0.75x": 0.75,
-    "1x": 1.0,
-    "1.25x": 1.25,
-    "1.5x": 1.5,
-    "2x": 2.0,
-  };
-
-  String selectedAudioTrack = "English";
-  String selectedPlaybackSpeed = "1x";
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  late final Player player;
+  late final VideoController controller;
+  List<AudioTrack> audioTracks = [];
+  List<SubtitleTrack> subtitleTracks = [];
+  int currentAudioIndex = 0;
+  int? currentSubtitleIndex; // Null = subtitles off
 
   @override
   void initState() {
     super.initState();
+    player = Player();
+    controller = VideoController(player);
 
-    BetterPlayerDataSource dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
-      videoUrl,
-    );
-
-    _betterPlayerController = BetterPlayerController(
-      BetterPlayerConfiguration(
-        autoPlay: true,
-        looping: false,
-        aspectRatio: 9 / 16,
-        controlsConfiguration: const BetterPlayerControlsConfiguration(
-          enableAudioTracks: false,
-          showControls: false,
-        ),
+    // Load video
+    player.open(
+      Media(
+        "https://1326678901.vod-qcloud.com/0d16610cvodhk1326678901/f44975dd5145403695130258515/9ApnbHtoI2YA.mp4",
       ),
-      betterPlayerDataSource: dataSource,
     );
 
-    // Sync video pause/resume with audio
-    _betterPlayerController.videoPlayerController?.addListener(() async {
-      if (_betterPlayerController.videoPlayerController!.value.isPlaying) {
-        if (!_audioPlayer.playing) {
-          _audioPlayer.play();
-        }
-      } else {
-        if (_audioPlayer.playing) {
-          _audioPlayer.pause();
-        }
-      }
-    });
+    // Listen for audio and subtitle tracks
+    player.stream.tracks.listen((tracks) {
+      final filteredAudio = tracks.audio
+          .where((track) =>
+      track.id.trim().isNotEmpty &&
+          track.codec != null &&
+          track.codec!.toLowerCase() != 'unknown')
+          .toList();
 
-    // Default start with English audio
-    _playAudio(audioTracks[selectedAudioTrack]!);
-  }
+      final filteredSubtitles = tracks.subtitle
+          .where((track) =>
+      track.id.trim().isNotEmpty &&
+          track.codec != null &&
+          track.codec!.toLowerCase() != 'unknown')
+          .toList();
 
-  Future<void> _playAudio(String url) async {
-    await _audioPlayer.setUrl(url);
-    _audioPlayer.play();
-  }
-
-  Future<void> _switchAudio(String language, String url) async {
-    Duration? pos = await _betterPlayerController.videoPlayerController?.position;
-    if (pos != null) {
-      await _audioPlayer.setUrl(url);
-      await _audioPlayer.seek(pos);
-      _audioPlayer.play();
       setState(() {
-        selectedAudioTrack = language;
+        audioTracks = filteredAudio;
+        subtitleTracks = filteredSubtitles;
+        if (currentSubtitleIndex == null && subtitleTracks.isNotEmpty) {
+          player.setSubtitleTrack(SubtitleTrack.no());
+        }
       });
+    });
+  }
+
+  void changeAudioTrack(int index) {
+    if (index >= 0 && index < audioTracks.length) {
+      player.setAudioTrack(audioTracks[index]); // Fixed: Pass AudioTrack object
+      setState(() {
+        currentAudioIndex = index;
+      });
+      debugPrint("Switched to audio track: ${audioTracks[index].title ?? audioTracks[index].language ?? audioTracks[index].id}");
     }
   }
 
-  void _changePlaybackSpeed(double speed) {
-    _betterPlayerController.setSpeed(speed);
-    _audioPlayer.setSpeed(speed);
-    setState(() {
-      selectedPlaybackSpeed = playbackSpeeds.entries
-          .firstWhere((entry) => entry.value == speed)
-          .key;
-    });
-  }
-
-  void _showVideoSettings() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return Container(
-          color: Colors.black26,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              const Text(
-                "Video Settings",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Playback Speed Section
-              const Text(
-                "Playback Speed",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Wrap(
-                spacing: 8,
-                children: playbackSpeeds.entries.map((entry) {
-                  bool isSelected = selectedPlaybackSpeed == entry.key;
-                  return GestureDetector(
-                    onTap: () {
-                      _changePlaybackSpeed(entry.value);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        entry.key,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Audio Track Section
-              const Text(
-                "Audio Language",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              ...audioTracks.entries.map((entry) {
-                bool isSelected = selectedAudioTrack == entry.key;
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                  leading: Radio<String>(
-                    value: entry.key,
-                    groupValue: selectedAudioTrack,
-                    onChanged: (value) {
-                      if (value != null) {
-                        Navigator.pop(context);
-                        _switchAudio(value, entry.value);
-                      }
-                    },
-                  ),
-                  title: Text(
-                    entry.key,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _switchAudio(entry.key, entry.value);
-                  },
-                );
-              }).toList(),
-
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
+  void changeSubtitleTrack(int? index) {
+    if (index == null) {
+      player.setSubtitleTrack(SubtitleTrack.no());
+      setState(() => currentSubtitleIndex = null);
+      debugPrint("Subtitles turned off");
+    } else if (index >= 0 && index < subtitleTracks.length) {
+      player.setSubtitleTrack(subtitleTracks[index]);
+      setState(() => currentSubtitleIndex = index);
+      debugPrint("Switched to subtitle track: ${subtitleTracks[index].title ?? subtitleTracks[index].language ?? subtitleTracks[index].id}");
+    }
   }
 
   @override
   void dispose() {
-    _betterPlayerController.dispose();
-    _audioPlayer.dispose();
+    player.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          BetterPlayer(controller: _betterPlayerController),
-
-          // Floating settings button
-          Positioned(
-            right: 16,
-            bottom: 100,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InkWell(
-                  onTap: _showVideoSettings,
-                  child: Column(
-                    children: const [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.black54,
-                        child: Icon(Icons.video_settings, color: Colors.white),
-                      ),
-                    ],
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Video 9:16 mobile aspect ratio
+            Center(
+              child: AspectRatio(
+                aspectRatio: 9 / 16,
+                child: Video(
+                  controller: controller,
+                  subtitleViewConfiguration: const SubtitleViewConfiguration(
+                    visible: true,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      backgroundColor: Colors.black54,
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+
+            // Settings & extra buttons
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: Column(
+                children: [
+                  // Bookmark button (dummy)
+                  IconButton(
+                    icon: const Icon(Icons.bookmark, color: Colors.white),
+                    onPressed: () {},
+                  ),
+                  const SizedBox(width: 10),
+                  // Comment button (dummy)
+                  IconButton(
+                    icon: const Icon(Icons.comment, color: Colors.white),
+                    onPressed: () {},
+                  ),
+                  const SizedBox(width: 10),
+                  // Settings button (borderless)
+                  FloatingActionButton(
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    child: const Icon(Icons.settings, color: Colors.white),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.black87,
+                        builder: (_) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Audio Tracks',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              if (audioTracks.isNotEmpty)
+                                ...List.generate(audioTracks.length, (index) {
+                                  final title = audioTracks[index].title?.isNotEmpty == true
+                                      ? audioTracks[index].title!
+                                      : (audioTracks[index].language?.isNotEmpty == true
+                                      ? audioTracks[index].language!
+                                      : "Track ${index + 1}");
+                                  return ListTile(
+                                    title: Text(title, style: const TextStyle(color: Colors.white)),
+                                    trailing: currentAudioIndex == index
+                                        ? const Icon(Icons.check, color: Colors.green)
+                                        : null,
+                                    onTap: () {
+                                      changeAudioTrack(index);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                })
+                              else
+                                const ListTile(
+                                  title: Text('No audio tracks available', style: TextStyle(color: Colors.white70)),
+                                ),
+                              const Divider(color: Colors.white54),
+                              const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Subtitles',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              // Subtitles off
+                              ListTile(
+                                title: const Text('Off', style: TextStyle(color: Colors.white)),
+                                trailing: currentSubtitleIndex == null
+                                    ? const Icon(Icons.check, color: Colors.green)
+                                    : null,
+                                onTap: () {
+                                  changeSubtitleTrack(null);
+                                  Navigator.pop(context);
+                                },
+                              ),
+                              if (subtitleTracks.isNotEmpty)
+                                ...List.generate(subtitleTracks.length, (index) {
+                                  final title = subtitleTracks[index].title?.isNotEmpty == true
+                                      ? subtitleTracks[index].title!
+                                      : (subtitleTracks[index].language?.isNotEmpty == true
+                                      ? subtitleTracks[index].language!
+                                      : "Subtitle ${index + 1}");
+                                  return ListTile(
+                                    title: Text(title, style: const TextStyle(color: Colors.white)),
+                                    trailing: currentSubtitleIndex == index
+                                        ? const Icon(Icons.check, color: Colors.green)
+                                        : null,
+                                    onTap: () {
+                                      changeSubtitleTrack(index);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                })
+                              else
+                                const ListTile(
+                                  title: Text('No subtitles available', style: TextStyle(color: Colors.white70)),
+                                ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

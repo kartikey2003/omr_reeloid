@@ -1,11 +1,12 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:new_u/splash.dart';
 import 'package:video_player/video_player.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'add-main.dart';
-import 'audio-track.dart';
 import 'h.dart';
+import 'multi_audio_player.dart';
 
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
@@ -24,7 +25,7 @@ class _HomepageState extends State<Homepage> {
     Homepage(),
     AddMain(),
     Reelss(),
-    MultiAudioPlayer()
+    VideoPlayerScreen()
   ];
 
   void _onItemTapped(int index) {
